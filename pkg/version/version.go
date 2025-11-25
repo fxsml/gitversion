@@ -2,6 +2,8 @@ package version
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -13,22 +15,43 @@ import (
 
 // Info contains version information
 type Info struct {
-	Version         string
-	GitCommit       string
-	GitCommitShort  string
-	GitBranch       string
-	GitBranchSlug   string
-	GitDescribe     string
-	LatestTag       string
-	BuildTime       string
-	IsDirty         bool
-	DefaultBranch   string
+	Version        string
+	GitCommit      string
+	GitCommitShort string
+	GitBranch      string
+	GitBranchSlug  string
+	GitDescribe    string
+	LatestTag      string
+	BuildTime      string
+	IsDirty        bool
+	DefaultBranch  string
 }
 
 // GetVersionInfo retrieves version information from the Git repository at the given path
 // defaultBranch specifies the main branch (e.g., "main" or "master"). If empty, attempts auto-detection.
 func GetVersionInfo(repoPath string, defaultBranch string) (*Info, error) {
-	repo, err := git.PlainOpen(repoPath)
+	// Find the git root by walking up until .git is found
+	absPath, err := filepath.Abs(repoPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get absolute path: %w", err)
+	}
+	origPath := absPath
+	gitRoot := ""
+	for {
+		gitDir := absPath + "/.git"
+		if fi, err := os.Stat(gitDir); err == nil && (fi.IsDir() || fi.Mode().IsRegular()) {
+			gitRoot = absPath
+			break
+		}
+		parent := parentDir(absPath)
+		if parent == absPath {
+			// Reached filesystem root
+			return nil, fmt.Errorf("failed to open repository: no .git found from %s upwards", origPath)
+		}
+		absPath = parent
+	}
+
+	repo, err := git.PlainOpen(gitRoot)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open repository: %w", err)
 	}
@@ -92,6 +115,19 @@ func GetVersionInfo(repoPath string, defaultBranch string) (*Info, error) {
 	}
 
 	return info, nil
+}
+
+// parentDir returns the parent directory of the given path
+func parentDir(path string) string {
+	if path == "/" {
+		return "/"
+	}
+	path = strings.TrimRight(path, "/")
+	idx := strings.LastIndex(path, "/")
+	if idx <= 0 {
+		return "/"
+	}
+	return path[:idx]
 }
 
 // detectDefaultBranch attempts to detect the default branch from the repository

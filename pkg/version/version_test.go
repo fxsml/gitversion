@@ -11,6 +11,74 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 )
 
+func TestGetVersionInfoFromSubdirectory(t *testing.T) {
+	// Create a temporary directory for test repository
+	tempDir, err := os.MkdirTemp("", "gitversion-test-subdir-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	// Initialize a git repository
+	repo, err := git.PlainInit(tempDir, false)
+	if err != nil {
+		t.Fatalf("Failed to init repository: %v", err)
+	}
+
+	// Create a subdirectory
+	subDir := filepath.Join(tempDir, "subdir1", "subdir2")
+	if err := os.MkdirAll(subDir, 0755); err != nil {
+		t.Fatalf("Failed to create subdirectory: %v", err)
+	}
+
+	// Create a test file in the root
+	testFile := filepath.Join(tempDir, "test.txt")
+	if err := os.WriteFile(testFile, []byte("test"), 0644); err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	// Add and commit the file
+	w, err := repo.Worktree()
+	if err != nil {
+		t.Fatalf("Failed to get worktree: %v", err)
+	}
+
+	if _, err := w.Add("test.txt"); err != nil {
+		t.Fatalf("Failed to add file: %v", err)
+	}
+
+	commit, err := w.Commit("Initial commit", &git.CommitOptions{
+		Author: &object.Signature{
+			Name:  "Test User",
+			Email: "test@example.com",
+		},
+	})
+	if err != nil {
+		t.Fatalf("Failed to commit: %v", err)
+	}
+
+	// Test GetVersionInfo from subdirectory
+	info, err := GetVersionInfo(subDir, "")
+	if err != nil {
+		t.Fatalf("GetVersionInfo failed from subdirectory: %v", err)
+	}
+
+	// Verify basic fields
+	if info.GitCommit != commit.String() {
+		t.Errorf("GitCommit = %q, want %q", info.GitCommit, commit.String())
+	}
+
+	if info.GitBranch != "master" && info.GitBranch != "main" {
+		t.Errorf("GitBranch = %q, want 'master' or 'main'", info.GitBranch)
+	}
+
+	// Version should be {branch-slug}-g{short-commit} since we have no tags
+	expectedVersion := info.GitBranchSlug + "-g" + info.GitCommitShort
+	if info.Version != expectedVersion {
+		t.Errorf("Version = %q, want %q", info.Version, expectedVersion)
+	}
+}
+
 func TestCreateBranchSlug(t *testing.T) {
 	tests := []struct {
 		name     string
