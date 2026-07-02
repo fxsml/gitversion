@@ -2,7 +2,10 @@ module github.com/fxsml/gitversion
 
 go 1.23.4
 
-require github.com/go-git/go-git/v5 v5.16.4
+require (
+	github.com/go-git/go-git/v5 v5.16.4
+	github.com/urfave/cli/v3 v3.10.1
+)
 
 require (
 	dario.cat/mergo v1.0.0 // indirect

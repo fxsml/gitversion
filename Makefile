@@ -2,7 +2,7 @@
 
 # Build configuration
 BUILD_OUT_NAME := gitversion
-BUILD_OUT_PATH := .
+BUILD_OUT_PATH := ./bin
 BIN_PATH := $(BUILD_OUT_PATH)/$(BUILD_OUT_NAME)
 
 .PHONY: help
@@ -11,11 +11,11 @@ help: ## Show this help message
 
 .PHONY: build
 build: ## Build the gitversion binary
-	@go build -o $(BIN_PATH)
+	@go build -o $(BIN_PATH) ./cmd/gitversion
 
 .PHONY: install
 install: ## Install gitversion to $GOPATH/bin
-	@go install
+	@go install ./cmd/gitversion
 
 .PHONY: test
 test: ## Run tests

@@ -435,6 +435,7 @@ func (i *Info) DetailedString() string {
 	return fmt.Sprintf(`Version:        %s
 Commit:         %s
 Branch:         %s
+Branch Slug:    %s
 Default Branch: %s
 Latest Tag:     %s
 Build Time:     %s
@@ -442,6 +443,7 @@ Dirty:          %s`,
 		i.Version,
 		i.GitCommit,
 		i.GitBranch,
+		i.GitBranchSlug,
 		i.DefaultBranch,
 		tagStr,
 		i.BuildTime,
