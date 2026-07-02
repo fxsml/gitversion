@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"runtime/debug"
 
 	"github.com/fxsml/gitversion"
 	"github.com/urfave/cli/v3"
@@ -55,9 +56,58 @@ var (
 		Sources: cli.EnvVars(gitversionEnvPrefix + "TARGET"),
 	}
 
+	versionCmd = &cli.Command{
+		Name:  "version",
+		Usage: "print the version of gitversion itself",
+		Action: func(_ context.Context, _ *cli.Command) error {
+			info, ok := debug.ReadBuildInfo()
+			if !ok {
+				fmt.Println("version: unknown (build info not available)")
+				return nil
+			}
+
+			v := info.Main.Version
+			if v == "" || v == "(devel)" {
+				v = "(devel)"
+			}
+			fmt.Printf("gitversion %s\n", v)
+
+			var commit, vcsTime, modified string
+			for _, s := range info.Settings {
+				switch s.Key {
+				case "vcs.revision":
+					commit = s.Value
+				case "vcs.time":
+					vcsTime = s.Value
+				case "vcs.modified":
+					modified = s.Value
+				}
+			}
+
+			if len(commit) >= 7 {
+				commit = commit[:7]
+			}
+			if commit != "" {
+				line := "  commit: " + commit
+				if modified == "true" {
+					line += " (dirty)"
+				}
+				fmt.Println(line)
+			}
+			if vcsTime != "" {
+				fmt.Println("  time:   " + vcsTime)
+			}
+			fmt.Println("  go:     " + info.GoVersion)
+			return nil
+		},
+	}
+
 	rootCmd = &cli.Command{
 		Name:  "gitversion",
 		Usage: "determine semantic version based on git tags",
+		Commands: []*cli.Command{
+			versionCmd,
+		},
 		Flags: []cli.Flag{
 			detailedFlag,
 			repoDirFlag,
