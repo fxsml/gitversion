@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/fxsml/gitversion/pkg/version"
+	"github.com/fxsml/gitversion"
 	"github.com/urfave/cli/v3"
 )
 
