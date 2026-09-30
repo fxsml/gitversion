@@ -92,6 +92,20 @@ Sanitizes the branch name: replaces `/` and `_` with `-`, keeps only alphanumeri
 - Can be overridden with `-default-branch` flag
 - **Important:** Determines whether to use git describe format or simple branch-commit format
 
+### Target Bumping (`-target patch|minor|major`)
+Instead of the default dev/describe string, compute the next semantic version from the
+latest tag matching `-prefix` (or all tags if `-prefix` is unset):
+- **HEAD already on the matching tag:** the tag is returned as-is — **not** bumped.
+- **HEAD ahead of the matching tag:** the tag is bumped by one patch/minor/major,
+  regardless of how many commits ahead.
+- **No matching tag:** treated as `0.0.0`, so `-target patch` yields `0.0.1`.
+- **Prefix scoping:** a tag sitting on HEAD that doesn't share the configured `-prefix`
+  is invisible to gitversion. In that case the version is still computed (and bumped)
+  from the nearest ancestor tag that *does* match the prefix — it is not treated as
+  "already at tag".
+- **Dirty tree:** no timestamp suffix is appended when `-target` is used.
+- `-target dev` (or omitting `-target`) is a no-op — same as default behavior.
+
 ## Examples
 
 | Branch | Position | Clean/Dirty | Output |
@@ -103,6 +117,9 @@ Sanitizes the branch name: replaces `/` and `_` with `-`, keeps only alphanumeri
 | main (default) | no tags | dirty | main-gabc123d-20251125115903 |
 | feature/new-feature | any | clean | feature-new-feature-gabc123d |
 | feature/new-feature | any | dirty | feature-new-feature-gabc123d-20251125115903 |
+| main (default), `-target patch` | at tag v1.0.0 | clean | v1.0.0 (not bumped) |
+| main (default), `-target patch` | 1+ commits after v1.0.0 | clean | v1.0.1 |
+| main (default), `-prefix svc/v -target patch` | at tag `other/v9.9.9` (non-matching prefix), 1 commit after `svc/v1.0.0` | clean | svc/v1.0.1 (prefix tag on HEAD ignored) |
 
 ## Development
 

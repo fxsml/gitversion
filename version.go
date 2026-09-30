@@ -145,6 +145,11 @@ func GetVersionInfo(repoPath string, opts Options) (*Info, error) {
 	}
 
 	if realTarget {
+		if atExactTag {
+			// HEAD is already on the tag (or path-filtered distance is zero);
+			// use it as-is instead of bumping to the next version.
+			return info, nil
+		}
 		bumped, err := bumpSemver(info.LatestTag, opts.Target)
 		if err != nil {
 			return nil, err

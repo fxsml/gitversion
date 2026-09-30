@@ -542,7 +542,7 @@ func TestBumpSemver(t *testing.T) {
 
 // TestGetVersionInfoWithTarget verifies the -target flag end-to-end.
 func TestGetVersionInfoWithTarget(t *testing.T) {
-	t.Run("patch at tag", func(t *testing.T) {
+	t.Run("patch at tag — HEAD already on the tag, use it as-is", func(t *testing.T) {
 		dir, repo, w := initRepo(t)
 		hash := writeAndCommit(t, dir, w, "f.txt", "1", "init")
 		lightweightTag(t, repo, "v1.2.3", hash)
@@ -551,12 +551,12 @@ func TestGetVersionInfoWithTarget(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if info.Version != "v1.2.4" {
-			t.Errorf("Version = %q, want v1.2.4", info.Version)
+		if info.Version != "v1.2.3" {
+			t.Errorf("Version = %q, want v1.2.3", info.Version)
 		}
 	})
 
-	t.Run("minor at tag", func(t *testing.T) {
+	t.Run("minor at tag — HEAD already on the tag, use it as-is", func(t *testing.T) {
 		dir, repo, w := initRepo(t)
 		hash := writeAndCommit(t, dir, w, "f.txt", "1", "init")
 		lightweightTag(t, repo, "v1.2.3", hash)
@@ -565,12 +565,12 @@ func TestGetVersionInfoWithTarget(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if info.Version != "v1.3.0" {
-			t.Errorf("Version = %q, want v1.3.0", info.Version)
+		if info.Version != "v1.2.3" {
+			t.Errorf("Version = %q, want v1.2.3", info.Version)
 		}
 	})
 
-	t.Run("major at tag", func(t *testing.T) {
+	t.Run("major at tag — HEAD already on the tag, use it as-is", func(t *testing.T) {
 		dir, repo, w := initRepo(t)
 		hash := writeAndCommit(t, dir, w, "f.txt", "1", "init")
 		lightweightTag(t, repo, "v1.2.3", hash)
@@ -579,12 +579,12 @@ func TestGetVersionInfoWithTarget(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if info.Version != "v2.0.0" {
-			t.Errorf("Version = %q, want v2.0.0", info.Version)
+		if info.Version != "v1.2.3" {
+			t.Errorf("Version = %q, want v1.2.3", info.Version)
 		}
 	})
 
-	t.Run("patch ahead of tag — same result as at tag", func(t *testing.T) {
+	t.Run("patch ahead of tag — bumps the last tag", func(t *testing.T) {
 		dir, repo, w := initRepo(t)
 		hash := writeAndCommit(t, dir, w, "f.txt", "1", "init")
 		lightweightTag(t, repo, "v1.2.3", hash)
@@ -594,7 +594,6 @@ func TestGetVersionInfoWithTarget(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		// target always bumps the last tag, regardless of distance
 		if info.Version != "v1.2.4" {
 			t.Errorf("Version = %q, want v1.2.4", info.Version)
 		}
@@ -613,10 +612,29 @@ func TestGetVersionInfoWithTarget(t *testing.T) {
 		}
 	})
 
-	t.Run("dirty tree — no timestamp suffix when target is set", func(t *testing.T) {
+	t.Run("dirty tree at tag — no timestamp suffix, tag used as-is", func(t *testing.T) {
 		dir, repo, w := initRepo(t)
 		hash := writeAndCommit(t, dir, w, "f.txt", "1", "init")
 		lightweightTag(t, repo, "v1.0.0", hash)
+		// make the tree dirty
+		if err := os.WriteFile(filepath.Join(dir, "f.txt"), []byte("dirty"), 0644); err != nil {
+			t.Fatalf("WriteFile: %v", err)
+		}
+
+		info, err := GetVersionInfo(dir, Options{Target: "patch"})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if info.Version != "v1.0.0" {
+			t.Errorf("Version = %q, want v1.0.0 (no dirty suffix, no bump)", info.Version)
+		}
+	})
+
+	t.Run("dirty tree ahead of tag — no timestamp suffix when target is set", func(t *testing.T) {
+		dir, repo, w := initRepo(t)
+		hash := writeAndCommit(t, dir, w, "f.txt", "1", "init")
+		lightweightTag(t, repo, "v1.0.0", hash)
+		writeAndCommit(t, dir, w, "f.txt", "2", "more work")
 		// make the tree dirty
 		if err := os.WriteFile(filepath.Join(dir, "f.txt"), []byte("dirty"), 0644); err != nil {
 			t.Fatalf("WriteFile: %v", err)
@@ -658,6 +676,24 @@ func TestGetVersionInfoWithTarget(t *testing.T) {
 		}
 		if info.Version != "svc/v2.4.0" {
 			t.Errorf("Version = %q, want svc/v2.4.0", info.Version)
+		}
+	})
+
+	t.Run("HEAD on a tag with a different prefix — still incremented", func(t *testing.T) {
+		dir, repo, w := initRepo(t)
+		hash := writeAndCommit(t, dir, w, "svc/f.go", "1", "init")
+		lightweightTag(t, repo, "svc/v2.3.4", hash)
+		headHash := writeAndCommit(t, dir, w, "svc/f.go", "2", "more work")
+		// Tag HEAD, but with a prefix that doesn't match the configured TagPrefix.
+		// It must be invisible to tag lookup, so HEAD is not treated as "at tag".
+		lightweightTag(t, repo, "other/v9.9.9", headHash)
+
+		info, err := GetVersionInfo(dir, Options{TagPrefix: "svc/v", Target: "patch"})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if info.Version != "svc/v2.3.5" {
+			t.Errorf("Version = %q, want svc/v2.3.5 (bumped from nearest matching-prefix tag)", info.Version)
 		}
 	})
 
